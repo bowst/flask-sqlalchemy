@@ -22,6 +22,7 @@ from flask.signals import Namespace
 from operator import itemgetter
 from threading import Lock
 from sqlalchemy import orm, event
+from sqlalchemy import MetaData
 from sqlalchemy.orm.exc import UnmappedClassError
 from sqlalchemy.orm.session import Session as SessionBase
 from sqlalchemy.event import listen
@@ -659,7 +660,8 @@ class SQLAlchemy(object):
 
     def __init__(self, app=None,
                  use_native_unicode=True,
-                 session_options=None):
+                 session_options=None,
+                 schema=None):
         self.use_native_unicode = use_native_unicode
 
         if session_options is None:
@@ -670,7 +672,12 @@ class SQLAlchemy(object):
         )
 
         self.session = self.create_scoped_session(session_options)
-        self.Model = self.make_declarative_base()
+
+        if schema:
+            self.Model = self.make_declarative_base(schema=schema)
+        else:
+            self.Model = self.make_declarative_base()
+
         self._engine_lock = Lock()
 
         if app is not None:
@@ -707,10 +714,16 @@ class SQLAlchemy(object):
         """
         return SignallingSession(self, **options)
 
-    def make_declarative_base(self):
+    def make_declarative_base(self, schema=None):
         """Creates the declarative base."""
+
+        metadata = None
+        if schema:
+            metadata = MetaData(schema=schema)
+
         base = declarative_base(cls=Model, name='Model',
-                                metaclass=_BoundDeclarativeMeta)
+                                metaclass=_BoundDeclarativeMeta,
+                                metadata=metadata)
         base.query = _QueryProperty(self)
         return base
 
